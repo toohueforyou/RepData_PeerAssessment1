@@ -1,0 +1,115 @@
+---
+title: "Submission"
+output: html_document
+---
+
+1. Loading and preprocessing the data  
+* Set echo == TRUE, message = FALSE, warning = FALSE
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+* Import dplyr
+```{r ,results="hide"}
+library(dplyr)
+```
+
+* Read CSV File into data value (as tibble) & convert date col to date value 
+```{r}
+unzip('activity.zip')
+data <- read.csv('activity.csv')
+data <- as_tibble(data)
+data$date <- as.Date(data$date)
+good_data <- data[complete.cases(data), ]
+
+```
+
+2. What is mean total number of steps taken per day?*
+* Calculate the total number of steps taken per day
+```{r}
+good_data <- group_by(good_data, date)
+totalStep <- summarize(good_data, sum(steps))
+print(totalStep)
+```
+
+* Make a histogram of the total number of steps taken each day
+``` {r}
+hist(totalStep$`sum(steps)`, main = "Histogram of total number of steps per day",
+     xlab = "Steps per day")
+```
+
+* Calculate and report the mean and median of the total number of steps  
+  taken per day
+```{r}
+mean(totalStep$`sum(steps)`)
+median(totalStep$`sum(steps)`)
+```
+
+3. What is the average daily activity pattern?
+* Make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+```{r}
+good_data <- group_by(good_data, interval)
+intervalSteps <- summarise(good_data, mean(steps))
+plot(intervalSteps$interval,intervalSteps$`mean(steps)`, type = 'l')
+```
+
+* Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+intervalSteps[[which.max(intervalSteps$`mean(steps)`),1]]
+```
+
+3. Inputing missing values
+* Calculate and report the total number of missing values in the dataset 
+```{r}
+sum(is.na(data[,1]))
+```
+
+* Devise a strategy for filling in all of the missing values in the dataset.  
+I will fill in the mean for that interval
+
+* Create a new dataset that is equal to the original dataset but with the missing data filled in.
+
+``` {r}
+badData <- data[is.na(data$steps),]
+replacedData <- select(left_join(badData, intervalSteps, by = "interval"), steps =  `mean(steps)`, date, interval)
+newData <- rbind(good_data, replacedData)
+newData <- arrange(newData, date, interval)
+```
+
+* Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+```{r}
+newData <- group_by(newData, date)
+newTotalStep <- summarize(newData, sum(steps))
+hist(newTotalStep$`sum(steps)`, main = "Histogram of total number of steps per day",
+     xlab = "Steps per day")
+mean(newTotalStep$`sum(steps)`)
+median(newTotalStep$`sum(steps)`)
+```
+The values differ.
+
+4. Are there differences in activity patterns between weekdays and weekends?
+* Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+``` {r}
+weekdays1 <- c('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday')
+newData$wDay <- factor((weekdays(newData$date) %in% weekdays1), 
+         levels=c(FALSE, TRUE), labels=c('weekend', 'weekday') )
+```
+
+* Make a panel plot containing a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). 
+```{r}
+par(mfrow=c(2,1))
+
+weekday_steps <- filter(newData, wDay == 'weekday')
+weekDayAverage <- summarise(group_by(weekday_steps, interval), mean(steps))
+
+weekend_steps <- filter(newData, wDay == 'weekend')
+weekEndAverage <- summarise(group_by(weekend_steps, interval), mean(steps))
+
+plot(weekDayAverage$interval,weekDayAverage$`mean(steps)`, type = 'l'
+     ,xlab='Intervals',ylab="Number of steps",
+     col='red',lwd=2, main="Weekday")
+plot(weekEndAverage$interval,weekEndAverage$`mean(steps)`, type = 'l'
+     ,xlab='Intervals',ylab="number of steps",
+     col='blue',lwd=2,main="Weekend")
+```
